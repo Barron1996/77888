@@ -1,0 +1,43 @@
+name: Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build
+        run: |
+          LOG="$GITHUB_WORKSPACE/build.log"
+          rm -rf src && mkdir -p src
+          z=$(ls -1 *.zip | sort -V | tail -n1)
+          echo "=== using $z ===" | tee "$LOG"
+          unzip -o "$z" -d src >> "$LOG" 2>&1
+          wc -c src/GCU_Module/app/src/main/java/com/gcu/hook/*.java >> "$LOG" 2>&1
+          cd src/GCU_Module
+          gradle assembleDebug --no-daemon 2>&1 | tee -a "$LOG"
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: APK
+          path: src/GCU_Module/app/build/outputs/apk/debug/*.apk
